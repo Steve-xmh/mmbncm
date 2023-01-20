@@ -35,8 +35,8 @@ export async function initPluginManager() {
 		settingsButton.nextElementSibling,
 	);
 
+	betterNCMSettingsButton.style.scale = "1.4";
 	betterNCMSettingsButton.addEventListener("click", () => {
-		betterNCMSettingsButton.style.scale = "2";
 		if (settingsView.classList.contains("ncmm-show")) {
 			hideSettings();
 		} else {
