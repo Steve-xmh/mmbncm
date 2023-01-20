@@ -36,6 +36,35 @@ fn method_type_encoding(ret: &Encoding, args: &[Encoding]) -> CString {
     CString::new(types).unwrap()
 }
 
+pub unsafe fn dump_class_methods(cls: *const Class) {
+    let mut count = 0;
+    let methods = class_copyMethodList(cls, &mut count);
+    let methods = core::slice::from_raw_parts(methods, count as _);
+    for (i, method) in methods.iter().enumerate() {
+        // NSLog(@"Method no #%d: %s", i, sel_getName(method_getName(mlist[i])));
+        println!("Method {}: {:?}", i, method_getName(*method));
+    }
+}
+
+pub unsafe fn add_method<F>(original_cls: *const Class, selector: Sel, hook_func: F)
+where
+    F: MethodImplementation,
+{
+    println!(
+        "正在向 {} 添加实例函数 [{} {}]",
+        (*original_cls).name(),
+        (*original_cls).name(),
+        selector.name()
+    );
+
+    let ret = F::Ret::encode();
+    let args = F::Args::encodings();
+    let args = args.as_ref();
+    let types = method_type_encoding(&ret, args);
+
+    class_addMethod(original_cls as _, selector, hook_func.imp(), types.as_ptr());
+}
+
 pub unsafe fn hook_method<F>(
     original_cls: *const Class,
     original_selector: Sel,

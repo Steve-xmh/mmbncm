@@ -37,7 +37,11 @@ export namespace ncm {
 	}
 
 	export function openUrl(url: string) {
-		window.legacyNativeCmder._envAdapter.callAdapter("os.navigateExternal", [url]);
+		window.legacyNativeCmder._envAdapter.callAdapter(
+			"os.navigateExternal",
+			[url],
+			() => {},
+		);
 	}
 
 	export function getNCMPackageVersion(): string {

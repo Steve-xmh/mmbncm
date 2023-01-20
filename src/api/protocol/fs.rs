@@ -10,11 +10,9 @@ pub fn read_dir(path: &str, req: URLRequest) -> URLResponse {
     let path = decode_url(path.trim_start_matches("?path="));
 
     if let Ok(read_dir) = std::fs::read_dir(path) {
-        for entry in read_dir {
-            if let Ok(entry) = entry {
-                if let Ok(path) = entry.path().absolutize() {
-                    entries.push(path.to_string_lossy().to_string());
-                }
+        for entry in read_dir.flatten() {
+            if let Ok(path) = entry.path().absolutize() {
+                entries.push(path.to_string_lossy().to_string());
             }
         }
     }
@@ -43,6 +41,15 @@ pub fn read_file(path: &str, req: URLRequest) -> URLResponse {
     let data = std::fs::read(path).unwrap_or_default();
 
     req.make_res().with_data(&data)
+}
+
+pub fn remove(path: &str, req: URLRequest) -> URLResponse {
+    let path = decode_url(path.trim_start_matches("?path="));
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_dir_all(&path);
+
+    req.make_res()
 }
 
 pub fn mkdir(path: &str, req: URLRequest) -> URLResponse {

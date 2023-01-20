@@ -2,8 +2,14 @@ import BetterNCM from "./betterncm-api";
 import { initPluginManager, onPluginLoaded } from "./plugin-manager";
 import { betterncmFetch } from "./betterncm-api/base";
 import { NCMPlugin, NCMInjectPlugin } from "./plugin";
+import VConsole from "vconsole";
 
 export let loadedPlugins: typeof window.loadedPlugins = {};
+export let vConsole: VConsole = new VConsole({
+	onReady() {
+		vConsole.hideSwitch();
+	}
+})
 
 const SAFE_MODE_KEY = "betterncm.safemode";
 const LOAD_ERROR_KEY = "betterncm.loaderror";
@@ -142,25 +148,27 @@ async function loadPlugins() {
 	const pageName = pageMap[location.pathname];
 
 	async function loadPlugin(mainPlugin: NCMPlugin) {
+		console.log("正在加载插件", mainPlugin.manifest.name);
 		const devMode = mainPlugin.devMode;
 		const manifest = mainPlugin.manifest;
 		const pluginPath = mainPlugin.pluginPath;
 
 		if (devMode && !manifest.noDevReload) {
-			betterncm_native.fs.watchDirectory(pluginPath, (_dir, path) => {
-				const RELOAD_EXTS = [".js", "manifest.json"];
-				if (RELOAD_EXTS.findIndex((ext) => path.endsWith(ext)) !== -1) {
-					console.warn(
-						"开发插件",
-						manifest.name,
-						"文件",
-						path,
-						"发生更新，即将重载！",
-					);
-
-					debouncedReload();
-				}
-			});
+			try {
+				betterncm_native.fs.watchDirectory(pluginPath, (_dir, path) => {
+					const RELOAD_EXTS = [".js", "manifest.json"];
+					if (RELOAD_EXTS.findIndex((ext) => path.endsWith(ext)) !== -1) {
+						console.warn(
+							"开发插件",
+							manifest.name,
+							"文件",
+							path,
+							"发生更新，即将重载！",
+						);
+						debouncedReload();
+					}
+				});
+			} catch {}
 		}
 
 		async function loadInject(filePath: string) {
@@ -179,9 +187,7 @@ async function loadPlugins() {
 					throw new PluginLoadError(
 						filePath,
 						err,
-						`插件脚本 ${filePath} 解析出错: ${
-							err.stack || err
-						}`,
+						`插件脚本 ${filePath} 解析出错: ${err.stack || err}`,
 						{
 							cause: err,
 						},
@@ -211,12 +217,14 @@ async function loadPlugins() {
 
 		// Load Injects
 		if (manifest.injects[pageName]) {
+			console.log(mainPlugin.manifest.name, pageName);
 			for (const inject of manifest.injects[pageName]) {
 				await loadInject(`${pluginPath}/${inject.file}`);
 			}
 		}
 
 		if (manifest.injects[location.pathname]) {
+			console.log(mainPlugin.manifest.name, location.pathname);
 			for (const inject of manifest.injects[location.pathname]) {
 				await loadInject(`${pluginPath}/${inject.file}`);
 			}
@@ -226,38 +234,49 @@ async function loadPlugins() {
 
 	window.loadedPlugins = loadedPlugins;
 
-	const pluginPaths = (await BetterNCM.fs.readDir("./plugins_runtime")).filter((path) => {
-		return !path.substring(path.lastIndexOf("/")).startsWith("/.")
-	});
+	const pluginPaths = (await BetterNCM.fs.readDir("./plugins_runtime")).filter(
+		(path) => {
+			return !path.substring(path.lastIndexOf("/")).startsWith("/.");
+		},
+	);
 
 	let plugins: NCMPlugin[] = [];
 
 	const loadPluginByPath = async (path: string, devMode: boolean) => {
+		if (!(await BetterNCM.fs.exists(`${path}/manifest.json`))) return;
 		try {
 			const manifest = JSON.parse(
 				await BetterNCM.fs.readFileText(`${path}/manifest.json`),
 			);
 
-			manifest.slug =
-				manifest.slug ??
-				manifest.name.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ /g, "-");
+			manifest.slug ??= manifest.name
+				.replace(/[^a-zA-Z0-9 ]/g, "")
+				.replace(/ /g, "-");
 
 			const mainPlugin = new NCMPlugin(manifest, path, devMode);
 			plugins.push(mainPlugin);
 		} catch (e) {
-			if (e instanceof SyntaxError) console.error("Failed to load plugin:", e);
-			else throw e;
+			if (e instanceof SyntaxError) console.error("插件加载失败：", e);
+			else {
+				console.warn("解析插件元数据失败：", path, e);
+				throw e;
+			}
 		}
 	};
 
 	plugins = sortPlugins(plugins) as NCMPlugin[];
 
-	for (const path of pluginPaths) loadPluginByPath(path, false);
+	const preloadPromises: Promise<void>[] = [];
+	for (const path of pluginPaths)
+		preloadPromises.push(loadPluginByPath(path, false));
 
 	if (await BetterNCM.fs.exists("./plugins_dev")) {
 		const devPluginPaths = await BetterNCM.fs.readDir("./plugins_dev");
-		for (const path of devPluginPaths) loadPluginByPath(path, true);
+		for (const path of devPluginPaths)
+			preloadPromises.push(loadPluginByPath(path, true));
 	}
+
+	await Promise.all(preloadPromises);
 
 	const loadingPromises: (Promise<void> | undefined)[] = plugins.map(
 		(plugin) => {
@@ -271,11 +290,17 @@ async function loadPlugins() {
 					plugin.pluginPath,
 					"wont be loaded.",
 				);
+				return undefined;
 			}
 		},
 	);
 
-	await Promise.all(loadingPromises);
+	try {
+		await Promise.all(loadingPromises);
+	} catch (e) {
+		console.warn("插件加载出错！", e, e.name, e.stack);
+	}
+
 	for (const name in loadedPlugins) {
 		const plugin: NCMPlugin = loadedPlugins[name];
 		plugin.injects.forEach((inject) => {
@@ -317,41 +342,46 @@ async function onLoadError(e: Error) {
 
 declare const loadingMask: HTMLDivElement;
 window.addEventListener("DOMContentLoaded", async () => {
-	// 加载管理器样式表
-	const styleContent = await (
-		await betterncmFetch("/internal/framework.css")
-	).text();
-	const styleEl = document.createElement("style");
-	styleEl.innerHTML = styleContent;
-	document.head.appendChild(styleEl);
-	
 	try {
-		await loadPlugins();
-	} catch (e) {
-		console.warn(e, e.stack)
+		// 加载管理器样式表
+		const styleContent = await (
+			await betterncmFetch("/internal/framework.css")
+		).text();
+		const styleEl = document.createElement("style");
+		styleEl.innerHTML = styleContent;
+		document.head.appendChild(styleEl);
+
+		await initPluginManager();
+
+		try {
+			await loadPlugins();
+		} catch (e) {
+			console.warn(e, e.stack);
+		}
+
+		// try {
+		// 	await Promise.race([
+		// 		Promise.all([loadPlugins(), initPluginManager()]),
+		// 		BetterNCM.utils.delay(2000),
+		// 	]);
+		// } catch (e) {
+		// 	onLoadError(e);
+		// 	return;
+		// }
+		
+		if ("loadingMask" in window) {
+			const anim = loadingMask.animate(
+				[{ opacity: 1 }, { opacity: 0, display: "none" }],
+				{
+					duration: 300,
+					fill: "forwards",
+					easing: "cubic-bezier(0.42,0,0.58,1)",
+				},
+			);
+			anim.commitStyles();
+		}
+		onPluginLoaded(loadedPlugins); // 更新插件管理器那边的插件列表
+	} catch (err) {
+		document.body.innerHTML = err;
 	}
-	
-	await initPluginManager();
-	
-	// try {
-	// 	await Promise.race([
-	// 		Promise.all([loadPlugins(), initPluginManager()]),
-	// 		BetterNCM.utils.delay(2000),
-	// 	]);
-	// } catch (e) {
-	// 	onLoadError(e);
-	// 	return;
-	// }
-	if ("loadingMask" in window) {
-		const anim = loadingMask.animate(
-			[{ opacity: 1 }, { opacity: 0, display: "none" }],
-			{
-				duration: 300,
-				fill: "forwards",
-				easing: "cubic-bezier(0.42,0,0.58,1)",
-			},
-		);
-		anim.commitStyles();
-	}
-	onPluginLoaded(loadedPlugins); // 更新插件管理器那边的插件列表
 });

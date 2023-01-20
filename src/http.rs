@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use rust_macios::{
     foundation::{NSData, NSString},
-    objective_c_runtime::{traits::ToId, *},
+    objective_c_runtime::{runtime::*, traits::ToId, *},
 };
 use serde::Serialize;
 
@@ -14,12 +14,34 @@ impl URLRequest {
         Self(v)
     }
 
-    pub fn body(&self) -> &[u8] {
+    pub fn body(&self) -> Vec<u8> {
         unsafe {
-            let http_body: id = msg_send![self.0, HTTPBody];
-            let len: c_ulong = msg_send![http_body, length];
-            let data: *mut c_void = msg_send![http_body, data];
-            core::slice::from_raw_parts(data as _, len as _)
+            dbg!(&*self.0);
+            let http_body: id = dbg!(msg_send![self.0, HTTPBody]);
+            if http_body.is_null() {
+                let http_body_stream: id = dbg!(msg_send![self.0, HTTPBodyStream]);
+                let mut result = Vec::with_capacity(256);
+                let mut buf = [0u8; 256];
+                let _: () = msg_send![http_body_stream, open];
+                while {
+                    let h: BOOL = msg_send![http_body_stream, hasBytesAvailable];
+                    h
+                } == YES
+                {
+                    let read_len: c_long = msg_send![http_body_stream,
+                        read: buf.as_mut_ptr()
+                        maxLength: buf.len() as c_ulong
+                    ];
+                    result.extend_from_slice(&buf[0..read_len as _]);
+                }
+                let _: () = msg_send![http_body_stream, close];
+
+                result
+            } else {
+                let len: c_ulong = msg_send![http_body, length];
+                let data: *mut c_void = msg_send![http_body, data];
+                core::slice::from_raw_parts(data as _, len as _).to_owned()
+            }
         }
     }
 

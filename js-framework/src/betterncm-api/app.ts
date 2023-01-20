@@ -1,4 +1,4 @@
-import { betterncmFetch } from "./base";
+import { betterncmFetch, webkitPostMessage } from "./base";
 
 const e = encodeURIComponent;
 
@@ -112,8 +112,12 @@ export namespace app {
 	 * @returns 是否成功
 	 */
 	export async function showConsole() {
-		const r = await betterncmFetch("/app/show_console");
-		return r.status === 200;
+		if (APP_CONF.isOSX) {
+			return await webkitPostMessage("/app/show_console");
+		} else {
+			const r = await betterncmFetch("/app/show_console");
+			return r.status === 200;
+		}
 	}
 
 	/**

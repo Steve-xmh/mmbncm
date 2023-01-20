@@ -41,6 +41,25 @@ export namespace utils {
 		} as unknown as T;
 	}
 
+	export function escapeData(
+		data: string | ArrayLike<number> | ArrayBufferLike,
+	): string {
+		const encoded =
+			typeof data === "string"
+				? new TextEncoder().encode(data)
+				: new Uint8Array(data);
+		if (encoded.length > 0) {
+			const result: string[] = [];
+			for (let i = 0; i < encoded.length; i++) {
+				result.push("%");
+				result.push(encoded[i].toString(16).padStart(2, "0"));
+			}
+			return result.join("");
+		} else {
+			return "";
+		}
+	}
+
 	/**
 	 * 重复调用某函数，直到其返回任意真值，并返回该真值。
 	 * @param func 函数

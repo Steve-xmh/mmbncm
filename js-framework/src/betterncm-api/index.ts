@@ -11,7 +11,7 @@ import { app } from "./app";
 import { ncm } from "./ncm";
 import { tests } from "./tests";
 import { utils } from "./utils";
-import { betterncmFetch } from "./base"
+import { betterncmFetch } from "./base";
 
 declare const loadingMask: HTMLDivElement;
 /**
@@ -41,7 +41,7 @@ const BetterNCM = {
 	utils,
 	tests,
 	reload,
-	betterncmFetch
+	betterncmFetch,
 };
 
 export { fs, app, ncm, utils, tests, reload };

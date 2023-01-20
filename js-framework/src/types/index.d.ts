@@ -17,6 +17,14 @@ declare global {
 	const ReactDOM: typeof import("react-dom");
 	// rome-ignore lint/suspicious/noExplicitAny: 云村自带的应用配置属性，因为量比较大所以不做类型限定了
 	const APP_CONF: any;
+	var betterncmBridgeCallbacks: Map<string, Function>;
+	export namespace webkit {
+		export namespace messageHandlers {
+			export namespace BetterNCM {
+				export function postMessage<T>(msg: T): void;
+			}
+		}
+	}
 	export namespace betterncm_native {
 		export namespace fs {
 			export function watchDirectory(

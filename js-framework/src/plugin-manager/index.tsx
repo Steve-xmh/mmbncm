@@ -34,6 +34,16 @@ export async function initPluginManager() {
 		betterNCMSettingsButton,
 		settingsButton.nextElementSibling,
 	);
+
+	betterNCMSettingsButton.addEventListener("click", () => {
+		betterNCMSettingsButton.style.scale = "2";
+		if (settingsView.classList.contains("ncmm-show")) {
+			hideSettings();
+		} else {
+			showSettings();
+		}
+	});
+
 	ReactDOM.render(<PluginManager />, settingsView);
 
 	settingsView.classList.add("better-ncm-manager");
@@ -67,13 +77,6 @@ export async function initPluginManager() {
 	})();
 
 	settingsButton.addEventListener("click", hideSettings);
-	betterNCMSettingsButton.addEventListener("click", () => {
-		if (settingsView.classList.contains("ncmm-show")) {
-			hideSettings();
-		} else {
-			showSettings();
-		}
-	});
 
 	// 如果外部页面变更（点击了其它按钮跳转）则关闭设置页面
 	window.addEventListener("hashchange", hideSettings);
@@ -193,39 +196,35 @@ const PluginManager: React.FC = () => {
 												<span className="plugin-list-name">
 													{loadPlugin.manifest.name}
 												</span>
-												{/* rome-ignore lint/a11y/useKeyWithClickEvents: <explanation> */}
-												<span
-													className="plugin-uninstall-btn"
-													onClick={async (e) => {
-														e.stopPropagation();
-														const pluginFilePath =
-															await BetterNCM.fs.readFileText(
-																`${loadPlugin.pluginPath}/.plugin.path.meta`,
-															);
-														await BetterNCM.fs.remove(pluginFilePath);
-
-														await BetterNCM.app.reloadPlugins();
-														BetterNCM.reload();
-													}}
-												>
-													<svg
-														xmlns="http://www.w3.org/2000/svg"
-														width={24}
-														height={24}
-														viewBox="0 0 24 24"
-														fill="none"
-														stroke="currentColor"
-														strokeWidth={2}
-														strokeLinecap="round"
-														strokeLinejoin="round"
-														className="feather feather-trash-2"
+												{key !== "PluginMarket" && (
+													// rome-ignore lint/a11y/useKeyWithClickEvents: <explanation>
+													<span
+														className="plugin-uninstall-btn"
+														onClick={async (e) => {
+															e.stopPropagation();
+															await BetterNCM.fs.remove(loadPlugin.pluginPath);
+															BetterNCM.reload();
+														}}
 													>
-														<polyline points="3 6 5 6 21 6" />
-														<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-														<line x1={10} y1={11} x2={10} y2={17} />
-														<line x1={14} y1={11} x2={14} y2={17} />
-													</svg>
-												</span>
+														<svg
+															xmlns="http://www.w3.org/2000/svg"
+															width={24}
+															height={24}
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="currentColor"
+															strokeWidth={2}
+															strokeLinecap="round"
+															strokeLinejoin="round"
+															className="feather feather-trash-2"
+														>
+															<polyline points="3 6 5 6 21 6" />
+															<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+															<line x1={10} y1={11} x2={10} y2={17} />
+															<line x1={14} y1={11} x2={14} y2={17} />
+														</svg>
+													</span>
+												)}
 											</div>
 										);
 									})}

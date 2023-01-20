@@ -49,9 +49,9 @@ else
 fi
 
 codesign --remove-signature "${app_path}"
-codesign -fs "${code_cert}" "${framework_path}"
-codesign -fs "${code_cert}" "${app_path}"
 cp "${shell_path}/Info.plist" "${framework_path}/Resources/Info.plist"
-# ${shell_path}/insert_dylib --strip-codesig --all-yes "${framework_path}/${framework_name}" "$app_executable_backup_path" "$app_executable_path"
+${shell_path}/insert_dylib --strip-codesig --all-yes "${framework_path}/${framework_name}" "$app_executable_backup_path" "$app_executable_path"
+codesign --entitlements entitlements.xml -s - -f "${framework_path}"
+codesign --entitlements entitlements.xml -s - -f "${app_path}"
 defaults write "com.netease.163music" WebKitDeveloperExtras -bool true
-DYLD_INSERT_LIBRARIES="${framework_path}/${framework_name}" "$app_executable_path"
+"$app_executable_path"

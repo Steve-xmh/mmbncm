@@ -1,5 +1,5 @@
-import { betterncmFetch } from "./base";
-
+import { betterncmFetch, webkitPostMessage } from "./base";
+import { utils } from "./utils";
 const e = encodeURIComponent;
 
 /**
@@ -51,7 +51,7 @@ export namespace fs {
 	 * @param filePath 需要挂载的文件路径
 	 * @returns 挂载到的 http 地址
 	 */
-	 export async function mountFile(filePath: string): Promise<string> {
+	export async function mountFile(filePath: string): Promise<string> {
 		const r = await betterncmFetch(`/fs/mount_file?path=${e(filePath)}`);
 		return await r.text();
 	}
@@ -79,11 +79,18 @@ export namespace fs {
 	 * @returns 是否成功
 	 */
 	export async function writeFileText(filePath: string, content: string) {
-		const r = await betterncmFetch(`/fs/write_file_text?path=${e(filePath)}`, {
-			method: "POST",
-			body: content,
-		});
-		return r.status === 200;
+		if (APP_CONF.isOSX) {
+			return await writeFile(filePath, content);
+		} else {
+			const r = await betterncmFetch(
+				`/fs/write_file_text?path=${e(filePath)}`,
+				{
+					method: "POST",
+					body: content,
+				},
+			);
+			return r.status === 200;
+		}
 	}
 
 	/**
@@ -93,13 +100,24 @@ export namespace fs {
 	 * @returns 是否成功
 	 */
 	export async function writeFile(filePath: string, content: string | Blob) {
-		const fd = new FormData();
-		fd.append("file", content);
-		const r = await betterncmFetch(`/fs/write_file?path=${e(filePath)}`, {
-			method: "POST",
-			body: fd,
-		});
-		return r.status === 200;
+		if (APP_CONF.isOSX) {
+			if (typeof content === "string") {
+				const data = utils.escapeData(content);
+				return await webkitPostMessage("/fs/write_file", filePath, data);
+			} else {
+				const rawData = await content.arrayBuffer();
+				const data = utils.escapeData(rawData);
+				return await webkitPostMessage("/fs/write_file", filePath, data);
+			}
+		} else {
+			const fd = new FormData();
+			fd.append("file", content);
+			const r = await betterncmFetch(`/fs/write_file?path=${e(filePath)}`, {
+				method: "POST",
+				body: fd,
+			});
+			return r.status === 200;
+		}
 	}
 
 	/**
