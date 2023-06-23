@@ -2,7 +2,7 @@ use rust_macios::{
     core_graphics::{CGPoint, CGSize},
     objective_c_runtime::{declare::MethodImplementation, runtime::*, *},
 };
-use std::ffi::CString;
+use std::{ffi::CString, path::Path};
 
 use crate::nslog;
 
@@ -36,14 +36,64 @@ fn method_type_encoding(ret: &Encoding, args: &[Encoding]) -> CString {
     CString::new(types).unwrap()
 }
 
-pub unsafe fn dump_class_methods(cls: *const Class) {
+#[derive(serde::Serialize)]
+pub struct MethodDump {
+    pub sel: String,
+    pub enc: String,
+    pub addr: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct ClassDump {
+    pub name: String,
+    pub methods: Vec<String>,
+    pub super_class: Option<Box<ClassDump>>,
+}
+
+pub unsafe fn dump_class_to_file(cls: *const Class, out_file: impl AsRef<Path>) {
+    let result = dump_class_methods(cls);
+    let _ = serde_yaml::to_writer(
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(out_file)
+            .unwrap(),
+        &result,
+    );
+}
+
+pub unsafe fn dump_class_methods(cls: *const Class) -> ClassDump {
     let mut count = 0;
     let methods = class_copyMethodList(cls, &mut count);
     let methods = core::slice::from_raw_parts(methods, count as _);
-    for (i, method) in methods.iter().enumerate() {
-        // NSLog(@"Method no #%d: %s", i, sel_getName(method_getName(mlist[i])));
-        println!("Method {}: {:?}", i, method_getName(*method));
+    let mut result = ClassDump {
+        name: (*cls).name().to_owned(),
+        methods: Vec::with_capacity(methods.len()),
+        super_class: None,
+    };
+    for method in methods {
+        let method = &**method;
+        let sel = method.name().name().to_owned();
+        let argn = method.arguments_count();
+        let mut argv = Vec::with_capacity(argn);
+        let ret = method.return_type();
+        for i in 0..argn {
+            argv.push(method.argument_type(i).unwrap());
+        }
+        let enc = method_type_encoding(&ret, &argv)
+            .to_string_lossy()
+            .to_string();
+        result
+            .methods
+            .push(format!("{:?} {} {}", method.implementation(), enc, sel));
     }
+    if let Some(superclass) = (*cls).superclass() {
+        if superclass.name() != "NSObject" {
+            result.super_class = Some(Box::new(dump_class_methods(superclass)));
+        }
+    }
+    result
 }
 
 pub unsafe fn add_method<F>(original_cls: *const Class, selector: Sel, hook_func: F)
@@ -81,6 +131,8 @@ pub unsafe fn hook_method<F>(
     );
     let original_method = class_getInstanceMethod(original_cls, original_selector);
 
+    assert!(!original_method.is_null(), "找不到原始方法");
+
     let ret = (*original_method).return_type();
     let args = (0..(*original_method).arguments_count())
         .map(|i| (*original_method).argument_type(i).unwrap())
@@ -114,6 +166,33 @@ pub unsafe fn hook_method<F>(
         }
         method_exchangeImplementations(original_method as _, swizzled_method as _);
     }
+}
+
+pub unsafe fn copy_method(
+    from_cls: *const Class,
+    dest_cls: *const Class,
+    from_sel: Sel,
+    dest_sel: Sel,
+) {
+    println!(
+        "正在复制实例函数 [{} {}] -> [{} {}]",
+        (*from_cls).name(),
+        from_sel.name(),
+        (*from_cls).name(),
+        from_sel.name(),
+    );
+    let from_method = class_getInstanceMethod(from_cls, from_sel);
+
+    assert!(!from_method.is_null(), "原类不存在或未找到");
+
+    let ret = (*from_method).return_type();
+    let args = (0..(*from_method).arguments_count())
+        .map(|i| (*from_method).argument_type(i).unwrap())
+        .collect::<Vec<_>>();
+    let types = method_type_encoding(&ret, &args);
+    let imp = (*from_method).implementation();
+
+    runtime::class_addMethod(dest_cls as _, dest_sel, imp, types.as_ptr());
 }
 
 pub unsafe fn hook_class_method<F>(

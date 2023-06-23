@@ -16,7 +16,7 @@ section.better-ncm-manager {
     z-index: 70;
     left: 200px;
     top: 60px;
-    bottom: 73px;
+    /* bottom: 73px; */
     right: 0;
     overflow: hidden overlay;
     position: absolute;

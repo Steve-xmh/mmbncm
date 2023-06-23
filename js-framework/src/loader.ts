@@ -2,14 +2,8 @@ import BetterNCM from "./betterncm-api";
 import { initPluginManager, onPluginLoaded } from "./plugin-manager";
 import { betterncmFetch } from "./betterncm-api/base";
 import { NCMPlugin, NCMInjectPlugin } from "./plugin";
-import VConsole from "vconsole";
 
 export let loadedPlugins: typeof window.loadedPlugins = {};
-export let vConsole: VConsole = new VConsole({
-	onReady() {
-		vConsole.hideSwitch();
-	}
-})
 
 const SAFE_MODE_KEY = "betterncm.safemode";
 const LOAD_ERROR_KEY = "betterncm.loaderror";
@@ -217,14 +211,12 @@ async function loadPlugins() {
 
 		// Load Injects
 		if (manifest.injects[pageName]) {
-			console.log(mainPlugin.manifest.name, pageName);
 			for (const inject of manifest.injects[pageName]) {
 				await loadInject(`${pluginPath}/${inject.file}`);
 			}
 		}
 
 		if (manifest.injects[location.pathname]) {
-			console.log(mainPlugin.manifest.name, location.pathname);
 			for (const inject of manifest.injects[location.pathname]) {
 				await loadInject(`${pluginPath}/${inject.file}`);
 			}
@@ -278,7 +270,7 @@ async function loadPlugins() {
 
 	await Promise.all(preloadPromises);
 
-	const loadingPromises: (Promise<void> | undefined)[] = plugins.map(
+	const loadingPromises = plugins.map(
 		(plugin) => {
 			if (!(plugin.manifest.slug in loadedPlugins)) {
 				loadedPlugins[plugin.manifest.slug] = plugin;
@@ -290,7 +282,7 @@ async function loadPlugins() {
 					plugin.pluginPath,
 					"wont be loaded.",
 				);
-				return undefined;
+				return Promise.resolve();
 			}
 		},
 	);
@@ -368,7 +360,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 		// 	onLoadError(e);
 		// 	return;
 		// }
-		
+
 		if ("loadingMask" in window) {
 			const anim = loadingMask.animate(
 				[{ opacity: 1 }, { opacity: 0, display: "none" }],

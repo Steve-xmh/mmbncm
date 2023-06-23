@@ -15,7 +15,7 @@ then
     echo "WARNING: You are using debug mode!"
     BUILD_ARGS=""
 else
-    BUILD_ARGS="--release -Z build-std=core,alloc,std,panic_abort -Z build-std-features=panic_immediate_abort"
+    BUILD_ARGS="--release"
 fi
 
 echo "Building ARM binary"
@@ -51,7 +51,9 @@ fi
 codesign --remove-signature "${app_path}"
 cp "${shell_path}/Info.plist" "${framework_path}/Resources/Info.plist"
 ${shell_path}/insert_dylib --strip-codesig --all-yes "${framework_path}/${framework_name}" "$app_executable_backup_path" "$app_executable_path"
+# cp "${shell_path}/target/aarch64-apple-darwin/debug/libthis_is_my_mac_ncm.d" "${framework_path}/${framework_name}.d"
 codesign --entitlements entitlements.xml -s - -f "${framework_path}"
 codesign --entitlements entitlements.xml -s - -f "${app_path}"
-defaults write "com.netease.163music" WebKitDeveloperExtras -bool true
+defaults write com.netease.163music WebKitDeveloperExtras 1
+defaults write com.apple.Safari IncludeInternalDebugMenu 1
 "$app_executable_path"

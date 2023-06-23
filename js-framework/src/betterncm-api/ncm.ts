@@ -61,6 +61,8 @@ export namespace ncm {
 		const v = getNCMFullVersion();
 		return parseInt(v.substring(v.lastIndexOf(".") + 1));
 	}
+	
+	const waitTick = () => new Promise(resolve => requestAnimationFrame(resolve))
 
 	export function searchApiFunction(
 		nameOrFinder: string | ((func: Function) => boolean),
@@ -74,29 +76,28 @@ export namespace ncm {
 		// rome-ignore lint/suspicious/noExplicitAny: 返回该函数的携带对象，方便做 bind 绑定
 	): [Function, any, string[]][] {
 		if (root === undefined || root === null) {
-			return [];
+			return result;
 		}
 		prevObjects.push(root);
 		if (typeof nameOrFinder === "string") {
 			if (typeof root[nameOrFinder] === "function") {
-				result.push([root[nameOrFinder], root, [...currentPath]]);
+				result.push([root[nameOrFinder], root, [...currentPath, nameOrFinder]]);
 			}
 		} else {
-			for (const key of Object.keys(root)) {
-				if (
-					Object.hasOwnProperty.call(root, key) &&
-					typeof root[key] === "function" &&
-					nameOrFinder(root[key])
-				) {
-					result.push([root[key], root, [...currentPath]]);
+			for (const key of Object.getOwnPropertyNames(root)) {
+				if (typeof root[key] === "function" && Object.hasOwn(root, key)) {
+					console.log(`${currentPath.join(".")}.${key}`);
+					if (nameOrFinder(root[key])) {
+						result.push([root[key], root, [...currentPath, key]]);
+					}
 				}
 			}
 		}
 		if (currentPath.length < 10) {
-			for (const key of Object.keys(root)) {
+			for (const key of Object.getOwnPropertyNames(root)) {
 				if (
-					Object.hasOwnProperty.call(root, key) &&
 					typeof root[key] === "object" &&
+					Object.hasOwn(root, key) &&
 					!prevObjects.includes(root[key]) &&
 					!(
 						currentPath.length === 1 &&

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "private": true,
   "scripts": {
     "build:dev": "esbuild ./src/index.ts --bundle --sourcemap=inline --external:./node_modules/* --target=chrome91 --outfile=../framework.js",
     "build": "esbuild ./src/index.ts --minify --bundle --sourcemap --external:./node_modules/* --target=chrome91 --outfile=../framework.js",
@@ -23,7 +24,6 @@
   },
   "dependencies": {
     "base91-js": "^1.0.8",
-    "rome": "^11.0.0",
-    "vconsole": "^3.15.0"
+    "rome": "^11.0.0"
   }
 }

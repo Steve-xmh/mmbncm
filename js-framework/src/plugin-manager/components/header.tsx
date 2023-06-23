@@ -1,5 +1,5 @@
 import BetterNCM from "../../betterncm-api";
-import { disableSafeMode, isSafeMode, vConsole } from "../../loader";
+import { disableSafeMode, isSafeMode } from "../../loader";
 import { Button } from "./button";
 import { ProgressRing } from "./progress-ring";
 
@@ -110,7 +110,9 @@ export const HeaderComponent: React.FC<{
 			<div>
 				<h1>
 					BetterNCM
-					<span style={{ fontSize: "smaller", opacity: "0.8", marginLeft: '1rem' }}>
+					<span
+						style={{ fontSize: "smaller", opacity: "0.8", marginLeft: "1rem" }}
+					>
 						{currentVersion}
 					</span>
 				</h1>
@@ -128,14 +130,6 @@ export const HeaderComponent: React.FC<{
 						}}
 					>
 						打开插件文件夹
-					</Button>
-					<Button
-						onClick={() => {
-							vConsole.show();
-							BetterNCM.app.showConsole();
-						}}
-					>
-						打开控制台
 					</Button>
 					<Button
 						onClick={async () => {

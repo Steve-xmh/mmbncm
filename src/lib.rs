@@ -1,5 +1,6 @@
 use rust_macios::{
-    foundation::NSString,
+    appkit::{NSMenu, NSMenuItem},
+    foundation::{NSString, NSURL},
     objective_c_runtime::{runtime::*, traits::*, *},
 };
 
@@ -28,6 +29,66 @@ macro_rules! nslog {
     };
 }
 
+fn dump_cookie(cookies: id) {
+    unsafe {
+        #[derive(serde::Serialize)]
+        struct CookieObj {
+            #[serde(rename = "Creation")]
+            creation: f64,
+            #[serde(rename = "Domain")]
+            domain: String,
+            #[serde(rename = "Expires")]
+            expires: f64,
+            #[serde(rename = "HasExpires")]
+            has_expires: f64,
+            #[serde(rename = "Httponly")]
+            http_only: f64,
+            #[serde(rename = "LastAccess")]
+            last_access: f64,
+            #[serde(rename = "Name")]
+            name: String,
+            #[serde(rename = "Path")]
+            path: String,
+            #[serde(rename = "Secure")]
+            secure: f64,
+            #[serde(rename = "Url")]
+            url: String,
+            #[serde(rename = "Value")]
+            value: String,
+        }
+
+        let cookies_len: usize = msg_send![cookies, count];
+        let mut out_cookies: Vec<CookieObj> = Vec::with_capacity(cookies_len);
+
+        for i in 0..cookies_len {
+            let cookie: id = msg_send![cookies, objectAtIndex: i];
+            let expires: id = msg_send![cookie, expiresDate];
+            out_cookies.push(CookieObj {
+                creation: 0.0,
+                domain: NSString::from_id(msg_send![cookie, domain]).to_string(),
+                expires: msg_send![expires, timeIntervalSince1970],
+                has_expires: 0.,
+                http_only: if msg_send![cookie, isHTTPOnly] {
+                    1.
+                } else {
+                    0.
+                },
+                last_access: 0.,
+                name: NSString::from_id(msg_send![cookie, name]).to_string(),
+                path: NSString::from_id(msg_send![cookie, path]).to_string(),
+                secure: if msg_send![cookie, isSecure] { 1. } else { 0. },
+                url: "".into(),
+                value: NSString::from_id(msg_send![cookie, value]).to_string(),
+            });
+        }
+
+        let _ = std::fs::write(
+            "cookies.json",
+            serde_json::to_string_pretty(&out_cookies).unwrap(),
+        );
+    }
+}
+
 #[ctor::ctor]
 fn init() {
     nslog!("ThisIsMyMacNCM 正在启动！");
@@ -43,10 +104,12 @@ fn init() {
     plugins::unzip_plugins();
 
     unsafe {
+        hook::dump_class_to_file(class!(WKWebView), "./WKWebView.original.yaml");
         nslog!("正在注册 WKWebView Handler");
         protocol::init_handler();
 
         let wkwebview = class!(WKWebView);
+        let yyy_wkwebview = class!(YYYRedirectWebView);
 
         let wkinit_hook = sel!(wkWebViewInitWithFrame:configuration:);
         let wkloadreq_hook = sel!(wkWebViewLoadRequest:);
@@ -58,15 +121,17 @@ fn init() {
             configuration: id,
         ) -> id {
             unsafe {
-                println!("已创建 WebView! {:?} {:?}", frame, (*configuration));
-
+                // 如果不是 YYY 开头的继承类则不做处理
                 if !this.class().name().starts_with("YYY") {
                     return msg_send![this, wkWebViewInitWithFrame: frame configuration: configuration];
                 }
 
-                hook::dump_class_methods(this.class());
-                hook::dump_class_methods(class!(WKWebView));
-                // let pref: id = msg_send![configuration, preferences];
+                println!(
+                    "已创建 WebView! {:?} {:?} {:?}",
+                    this,
+                    frame,
+                    (*configuration)
+                );
 
                 let user_ctl: id = msg_send![configuration, userContentController];
 
@@ -93,51 +158,13 @@ fn init() {
                         protocol::API_PATH
                     ),
                 );
-                dbg!(framework_data.split('\n').take(2).collect::<Vec<_>>());
+
                 add_user_script(user_ctl, framework_data.as_str());
-
-                // let _: id = msg_send![pref, setDeveloperExtrasEnabled: YES];
-
-                // let inspector: id = dbg!(msg_send![class!(WebInspector), alloc]);
 
                 let r: id = dbg!(
                     msg_send![this, wkWebViewInitWithFrame: frame configuration: configuration]
                 );
 
-                // let s: BOOL = msg_send![inspector, respondsToSelector: sel!(initWithWebView:)];
-
-                // println!("正在初始化 Handler");
-
-                // println!("正在初始化调试器");
-                // if s == YES {
-                //     let _: id = dbg!(msg_send![inspector, initWithWebView: this as *mut _]);
-                // } else {
-                //     let _: id = dbg!(msg_send![
-                //         inspector,
-                //         initWithInspectedWebView: this as *mut _
-                //     ]);
-                // }
-
-                let _inspector: id = msg_send![this, _inspector];
-                dbg!(&*_inspector);
-
-                let _delegate: id = dbg!(msg_send![_inspector, setDelegate: this as id]);
-
-                hook::dump_class_methods((*_inspector).class());
-
-                // println!("正在脱离调试器");
-                // let _: id = dbg!(msg_send![_inspector, attach]);
-                // let _: id = dbg!(msg_send![_inspector, detach]);
-                // let _: id = dbg!(msg_send![_inspector, connect]);
-                // let c: BOOL = dbg!(msg_send![_inspector, isVisible]);
-                // let c: BOOL = dbg!(msg_send![_inspector, isConnected]);
-                // println!("正在显示调试器");
-                // let _: id = dbg!(msg_send![_inspector, show]);
-                // let _: id = dbg!(msg_send![_inspector, showConsole]);
-                // let c: BOOL = dbg!(msg_send![_inspector, isVisible]);
-                // let c: BOOL = dbg!(msg_send![_inspector, isConnected]);
-
-                let _: id = msg_send![this, _setAllowsRemoteInspection: YES];
                 let _: id = msg_send![this, disableWebSecurity];
 
                 r
@@ -148,12 +175,6 @@ fn init() {
             unsafe {
                 let url: id = msg_send![req, URL];
                 let href: NSString = NSString::from_id(msg_send![url, absoluteString]);
-
-                // extern "C" fn js_callback(value: id, err: id) {
-                //     unsafe {
-                //         println!("脚本执行完成: {:?} {:?}", (*value), (*err));
-                //     }
-                // }
 
                 println!("正在加载请求：{:?} {}", (*req), href);
 
@@ -171,18 +192,27 @@ fn init() {
             }
         }
 
-        extern "C" fn inspector_fully_loaded(_this: &mut Object, _: Sel, inspector: id) {
+        extern "C" fn sheared_cookie_storage_for_group_container_identifier(
+            this: &mut Class,
+            _: Sel,
+            identifier: id,
+        ) -> id {
             unsafe {
                 // inspectorFrontendLoaded:
-                println!("检查器加载完成！");
-                let _: BOOL = msg_send![inspector, show];
+                println!("正在获取来自 {} 的 Cookies", NSString::from_id(identifier));
+                msg_send![
+                    this,
+                    rawSharedCookieStorageForGroupContainerIdentifier: identifier
+                ]
             }
         }
 
-        hook::add_method(
-            wkwebview,
-            sel!(inspectorFrontendLoaded:),
-            inspector_fully_loaded as extern "C" fn(&mut Object, Sel, id),
+        hook::hook_class_method(
+            class!(NSHTTPCookieStorage),
+            sel!(sharedCookieStorageForGroupContainerIdentifier:),
+            sel!(rawSharedCookieStorageForGroupContainerIdentifier:),
+            sheared_cookie_storage_for_group_container_identifier
+                as extern "C" fn(&mut Class, Sel, id) -> id,
         );
 
         extern "C" fn ns_url_protocol_register_class(
@@ -195,7 +225,11 @@ fn init() {
                 // registerClass
                 let _: id = msg_send![this, nsURLProtocolRegisterClass: protocol_class];
                 nslog!("正在注册自定义 URL 协议");
-                protocol::init_protocol();
+                static mut registered: bool = false;
+                if !registered {
+                    registered = true;
+                    protocol::init_protocol();
+                }
             }
         }
 
@@ -204,6 +238,136 @@ fn init() {
             sel!(initWithFrame:configuration:),
             wkinit_hook,
             webview_init as extern "C" fn(&mut Object, Sel, CGRect, id) -> id,
+        );
+        hook::copy_method(
+            class!(NSObject),
+            class!(WKInspectorWKWebView),
+            sel!(wkWebViewInitWithFrame:configuration:),
+            sel!(initWithFrame:configuration:),
+        );
+
+        extern "C" fn enable_developer_extras_if_needed(this: &mut Object, _: Sel) {
+            unsafe {
+                let conf: id = msg_send![this, configuration];
+                let pref: id = msg_send![conf, preferences];
+                let _: BOOL = dbg!(msg_send![
+                    pref,
+                    respondsToSelector: sel!(_setDeveloperExtrasEnabled:)
+                ]);
+                let _: id = msg_send![pref, _setDeveloperExtrasEnabled: YES];
+                let _: BOOL = dbg!(msg_send![
+                    this,
+                    respondsToSelector: sel!(_setAllowsRemoteInspection:)
+                ]);
+                let _: id = msg_send![this, _setAllowsRemoteInspection: YES];
+                println!("已开启调试器");
+            }
+        }
+
+        hook::add_method(
+            yyy_wkwebview,
+            sel!(enableDeveloperExtrasIfNeeded),
+            enable_developer_extras_if_needed as extern "C" fn(&mut Object, Sel),
+        );
+
+        extern "C" fn load_html_string_base_url(this: &mut Object, _: Sel, html: id, base_url: id) {
+            unsafe {
+                // inspectorFrontendLoaded:
+                let html = NSString::from_id(html);
+                let base_url = NSURL::from_id(base_url);
+
+                println!("正在设置 HTML 给 {this:?}");
+                println!("内容: {html}");
+                println!("url: {base_url}");
+
+                let _: BOOL =
+                    msg_send![this, wkLoadHTMLString: html.to_id() baseURL: base_url.to_id()];
+            }
+        }
+
+        extern "C" fn load_url_string(this: &mut Object, _: Sel, url: id) {
+            unsafe {
+                // inspectorFrontendLoaded:
+                let mut is_app_html = false;
+                if url.is_null() {
+                    println!("正在跳转到空对象链接");
+                } else {
+                    let url = NSString::from_id(url);
+                    if let Ok(url) = url.as_str() {
+                        is_app_html = url.starts_with("orpheus://orpheus/pub/app.html");
+                    }
+                    println!("正在跳转到链接 {url}");
+                }
+
+                if is_app_html {
+                    let url = NSString::from_id(url);
+                    let url = url
+                        .as_str()
+                        .unwrap()
+                        .to_string()
+                        .replace("webviewType=0", "webviewType=1");
+                    let url = NSString::from(url).to_id();
+                    let _: BOOL = msg_send![this, yyyLoadUrlString: url];
+
+                    let _: () = msg_send![this, _setAllowsRemoteInspection: YES];
+                    let _: () = dbg!(msg_send![this, enableDeveloperExtrasIfNeeded]);
+                    let _: () = dbg!(msg_send![this, disableWebSecurity]);
+                    let _main_frame: id = dbg!(msg_send![this, _mainFrame]);
+                    let _inspector: id = dbg!(msg_send![this, _inspector]);
+                    dbg!(&*_main_frame);
+                    dbg!(&*_inspector);
+
+                    println!("正在脱离调试器");
+                    let _: () = dbg!(msg_send![_inspector, init]);
+                    let _: () = dbg!(msg_send![_inspector, detach]);
+                    let _: () = dbg!(msg_send![_inspector, connect]);
+                    let inspector_web_view: id = dbg!(msg_send![_inspector, inspectorWebView]);
+                    dbg!(&*inspector_web_view);
+
+                    println!("正在显示调试器");
+                    let _: () = dbg!(msg_send![_inspector, show]);
+                    let _: () = dbg!(msg_send![_inspector, showConsole]);
+                    let _c: BOOL = dbg!(msg_send![_inspector, isVisible]);
+                    let _c: BOOL = dbg!(msg_send![_inspector, isConnected]);
+                } else {
+                    let _: BOOL = msg_send![this, yyyLoadUrlString: url];
+                }
+            }
+        }
+
+        extern "C" fn set_context_menu_delegate(this: &mut Object, _: Sel, delegate: id) {
+            unsafe {
+                // inspectorFrontendLoaded:
+                if delegate.is_null() {
+                    println!("正在移除上下文菜单代理");
+                } else {
+                    let delegate = &*delegate;
+                    println!("正在设置上下文菜单代理 {delegate:?}");
+                }
+
+                let _: id = msg_send![this, yyySetContextMenuDelegate: delegate];
+            }
+        }
+
+        hook::hook_method(
+            yyy_wkwebview,
+            sel!(loadUrlString:),
+            sel!(yyyLoadUrlString:),
+            load_url_string as extern "C" fn(&mut Object, Sel, id),
+        );
+
+        hook::hook_method(
+            yyy_wkwebview,
+            sel!(setContextMenuDelegate:),
+            sel!(yyySetContextMenuDelegate:),
+            set_context_menu_delegate as extern "C" fn(&mut Object, Sel, id),
+        );
+
+        hook::hook_method(
+            wkwebview,
+            sel!(loadHTMLString:baseURL:),
+            sel!(wkLoadHTMLString:baseURL:),
+            load_html_string_base_url as extern "C" fn(&mut Object, Sel, id, id),
         );
 
         hook::hook_class_method(
@@ -226,6 +390,47 @@ fn init() {
             sel!(wvSetUIDelegate:),
             webview_set_ui_delegate as extern "C" fn(&mut Object, Sel, id),
         );
+
+        extern "C" fn right_click_menu_with_default_menu(
+            _this: &mut Object,
+            _: Sel,
+            menu: id,
+        ) -> id {
+            menu
+        }
+
+        hook::hook_method(
+            yyy_wkwebview,
+            sel!(rightClickMenuWithDefaultMenu:),
+            sel!(yyyRightClickMenuWithDefaultMenu:),
+            right_click_menu_with_default_menu as extern "C" fn(&mut Object, Sel, id) -> id,
+        );
+
+        extern "C" fn will_open_context_menu_with_element(
+            this: &mut Object,
+            _: Sel,
+            menu: id,
+        ) -> id {
+            unsafe {
+                let menu = NSMenu::from_id(menu);
+                println!("正在显示上下文菜单：{:?}", menu,);
+                let menu = menu.to_id();
+                let item: id = msg_send![menu, itemAtIndex: 1];
+                let mut item = NSMenuItem::from_id(item);
+                item.set_enabled(true);
+
+                println!("{:?} {:?}", item, item.action());
+                msg_send![this, hooked_rightClickMenuWithDefaultMenu: menu]
+            }
+        }
+        hook::hook_method(
+            class!(YYYRedirectWebView),
+            sel!(rightClickMenuWithDefaultMenu:),
+            sel!(hooked_rightClickMenuWithDefaultMenu:),
+            will_open_context_menu_with_element as extern "C" fn(&mut Object, Sel, id) -> id,
+        );
+
+        hook::dump_class_to_file(class!(WKWebView), "./WKWebView.hooked.yaml");
     }
     nslog!("初始化完成！");
 }

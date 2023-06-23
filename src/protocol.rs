@@ -154,7 +154,7 @@ impl CallHandlerCtx {
 fn process_handler(body: id, wkwebview: id) -> DynResult<String> {
     unsafe {
         body.ensure_kind_of_class(class!(NSDictionary))
-            .with_context(|| format!("警告：Handler 接收到了类型不正确的信息: {:?}", body))?;
+            .with_context(|| format!("警告：Handler 接收到了类型不正确的信息: {body:?}"))?;
 
         let return_id: id = msg_send![body, objectForKey: NSString::from("returnId").to_id()];
         let call_type: id = msg_send![body, objectForKey: NSString::from("type").to_id()];
@@ -162,32 +162,23 @@ fn process_handler(body: id, wkwebview: id) -> DynResult<String> {
         return_id
             .ensure_kind_of_class(class!(NSString))
             .with_context(|| {
-                format!(
-                    "警告：Handler 接收到了 returnId 类型不正确的信息: {:?}",
-                    return_id
-                )
+                format!("警告：Handler 接收到了 returnId 类型不正确的信息: {return_id:?}")
             })?;
         call_type
             .ensure_kind_of_class(class!(NSString))
             .with_context(|| {
-                format!(
-                    "警告：Handler 接收到了 type 类型不正确的信息: {:?}",
-                    call_type
-                )
+                format!("警告：Handler 接收到了 type 类型不正确的信息: {call_type:?}")
             })?;
         arguments
             .ensure_kind_of_class(class!(NSArray))
             .with_context(|| {
-                format!(
-                    "警告：Handler 接收到了 arguments 类型不正确的信息: {:?}",
-                    body
-                )
+                format!("警告：Handler 接收到了 arguments 类型不正确的信息: {body:?}")
             })?;
         let return_id = NSString::from_id(return_id).to_string();
         let call_type = NSString::from_id(call_type).to_string();
 
-        println!("returnId: {}", return_id);
-        println!("type: {}", call_type);
+        println!("returnId: {return_id}");
+        println!("type: {call_type}");
         println!("arguments: {:?}", &*arguments);
 
         let return_id = serde_json::to_string(&return_id)?;
@@ -300,7 +291,7 @@ pub unsafe fn init_protocol() {
 
             if should_accept == YES {
                 let full_url = NSString::from_id(msg_send![url, absoluteString]);
-                println!("接收到原生请求：{}", full_url);
+                // println!("接收到原生请求：{}", full_url);
                 should_accept = if full_url.as_str().unwrap().starts_with(API_PATH) {
                     YES
                 } else {
@@ -315,7 +306,7 @@ pub unsafe fn init_protocol() {
     extern "C" fn start_loading(this: &mut Object, _: Sel) {
         unsafe {
             let raw_req: id = msg_send![this, request];
-            let method = NSString::from_id(msg_send![raw_req, HTTPMethod]);
+            let _method = NSString::from_id(msg_send![raw_req, HTTPMethod]);
             let req: id = msg_send![raw_req, mutableCopy];
 
             let key = NSString::from("betterNCMURLProtocolKey").to_id();
@@ -326,7 +317,7 @@ pub unsafe fn init_protocol() {
 
             let path = NSString::from_id(msg_send![url, absoluteString]);
 
-            println!("{} {}", method, path);
+            // println!("{} {}", method, path);
 
             if let Ok(path) = path.as_str() {
                 if let Some(path) = path.strip_prefix(API_PATH) {
@@ -349,7 +340,7 @@ pub unsafe fn init_protocol() {
                         }
                     }
 
-                    println!("警告：无法找到匹配的 API 回调：{}", path);
+                    println!("警告：无法找到匹配的 API 回调：{path}");
                 }
             }
 
@@ -371,8 +362,8 @@ pub unsafe fn init_protocol() {
 
     extern "C" fn canonical_req_for_req(_: &Class, _: Sel, req: id) -> id {
         unsafe {
-            let stream: id = msg_send![req, HTTPBodyStream];
-            dbg!(&*stream);
+            let _stream: id = msg_send![req, HTTPBodyStream];
+            // dbg!(&*stream);
             req
         }
     }

@@ -8,8 +8,8 @@ fn main() {
         // .arg("--external:./node_modules/*")
         .arg("--target=safari11")
         .arg("--banner:js=/*INSERT_CONSTS_HERE*/")
-        .arg(format!("--metafile={}/metafile.json", out_dir))
-        .arg(format!("--outdir={}", out_dir));
+        .arg(format!("--metafile={out_dir}/metafile.json"))
+        .arg(format!("--outdir={out_dir}"));
     let profile = std::env::var("PROFILE").unwrap();
     match profile.as_str() {
         "debug" => {
@@ -24,8 +24,8 @@ fn main() {
         cmd.current_dir("js-framework").status().unwrap().code(),
         Some(0)
     );
-    let metafile = json::from(std::fs::read(format!("{}/metafile.json", out_dir)).unwrap());
+    let metafile = json::from(std::fs::read(format!("{out_dir}/metafile.json")).unwrap());
     for (k, _v) in metafile["inputs"].entries() {
-        println!("cargo:rerun-if-changed=./js-framework/{}", k);
+        println!("cargo:rerun-if-changed=./js-framework/{k}");
     }
 }
