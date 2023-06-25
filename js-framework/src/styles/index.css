@@ -10,6 +10,10 @@
     width: unset;
 }
 
+.m-tool {
+    padding-right: 36px;
+}
+
 section.better-ncm-manager {
     display: none !important;
     background: transparent !important;

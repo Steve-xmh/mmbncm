@@ -154,6 +154,7 @@ fn init() {
                         "\
                 const BETTERNCM_API_KEY=\"\";\
                 const BETTERNCM_API_PATH=\"{}\";\
+                window.BETTERNCM_FILES_PATH=\"\";\
                 ",
                         protocol::API_PATH
                     ),
@@ -299,39 +300,7 @@ fn init() {
                     println!("正在跳转到链接 {url}");
                 }
 
-                if is_app_html {
-                    let url = NSString::from_id(url);
-                    let url = url
-                        .as_str()
-                        .unwrap()
-                        .to_string()
-                        .replace("webviewType=0", "webviewType=1");
-                    let url = NSString::from(url).to_id();
-                    let _: BOOL = msg_send![this, yyyLoadUrlString: url];
-
-                    let _: () = msg_send![this, _setAllowsRemoteInspection: YES];
-                    let _: () = dbg!(msg_send![this, enableDeveloperExtrasIfNeeded]);
-                    let _: () = dbg!(msg_send![this, disableWebSecurity]);
-                    let _main_frame: id = dbg!(msg_send![this, _mainFrame]);
-                    let _inspector: id = dbg!(msg_send![this, _inspector]);
-                    dbg!(&*_main_frame);
-                    dbg!(&*_inspector);
-
-                    println!("正在脱离调试器");
-                    let _: () = dbg!(msg_send![_inspector, init]);
-                    let _: () = dbg!(msg_send![_inspector, detach]);
-                    let _: () = dbg!(msg_send![_inspector, connect]);
-                    let inspector_web_view: id = dbg!(msg_send![_inspector, inspectorWebView]);
-                    dbg!(&*inspector_web_view);
-
-                    println!("正在显示调试器");
-                    let _: () = dbg!(msg_send![_inspector, show]);
-                    let _: () = dbg!(msg_send![_inspector, showConsole]);
-                    let _c: BOOL = dbg!(msg_send![_inspector, isVisible]);
-                    let _c: BOOL = dbg!(msg_send![_inspector, isConnected]);
-                } else {
-                    let _: BOOL = msg_send![this, yyyLoadUrlString: url];
-                }
+                let _: BOOL = msg_send![this, yyyLoadUrlString: url];
             }
         }
 

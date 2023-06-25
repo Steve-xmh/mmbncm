@@ -22,7 +22,7 @@ export async function initPluginManager() {
 	betterNCMSettingsButton.href = "javascript:void(0)";
 	betterNCMSettingsButton.title = "BetterNCM";
 	if (APP_CONF.isOSX) {
-		betterNCMSettingsButton.innerHTML = `<svg style='transform: scale(0.8);'><use xlink:href="orpheus://orpheus/style/res/svg/sidebar.sp.svg#icn-discover"></use></svg>`;
+		betterNCMSettingsButton.innerHTML = `<svg><use xlink:href="orpheus://orpheus/style/res/svg/sidebar.sp.svg#icn-discover"></use></svg>`;
 	} else {
 		betterNCMSettingsButton.innerHTML = `<svg style='transform: scale(0.8);'><use xlink:href="orpheus://orpheus/style/res/svg/topbar.sp.svg#logo_white"></use></svg>`;
 	}
@@ -35,7 +35,7 @@ export async function initPluginManager() {
 		settingsButton.nextElementSibling,
 	);
 
-	betterNCMSettingsButton.style.scale = "1.4";
+	betterNCMSettingsButton.style.scale = APP_CONF.isOSX ? "1.2" : "1.4";
 	betterNCMSettingsButton.addEventListener("click", () => {
 		if (settingsView.classList.contains("ncmm-show")) {
 			hideSettings();
