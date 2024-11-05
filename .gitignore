@@ -2,3 +2,6 @@
 /Cargo.lock
 /js-framework/node_modules
 .DS_Store
+framework.js
+framework.css
+*.map

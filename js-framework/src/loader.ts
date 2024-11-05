@@ -169,7 +169,7 @@ async function loadPlugins() {
 			if (!manifest.slug) return;
 			const code = await BetterNCM.fs.readFileText(filePath);
 
-			if (filePath.endsWith(".js")) {
+			if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
 				const plugin = new NCMInjectPlugin(mainPlugin, filePath);
 				try {
 					const loadingPromise = new AsyncFunction("plugin", code).call(
@@ -333,47 +333,49 @@ async function onLoadError(e: Error) {
 }
 
 declare const loadingMask: HTMLDivElement;
-window.addEventListener("DOMContentLoaded", async () => {
-	try {
-		// 加载管理器样式表
-		const styleContent = await (
-			await betterncmFetch("/internal/framework.css")
-		).text();
-		const styleEl = document.createElement("style");
-		styleEl.innerHTML = styleContent;
-		document.head.appendChild(styleEl);
-
-		await initPluginManager();
-
+if (location.href.startsWith("orpheus://orpheus/pub/app.html")) {
+	window.addEventListener("DOMContentLoaded", async () => {
 		try {
-			await loadPlugins();
-		} catch (e) {
-			console.warn(e, e.stack);
-		}
+			// 加载管理器样式表
+			const styleContent = await (
+				await betterncmFetch("/internal/framework.css")
+			).text();
+			const styleEl = document.createElement("style");
+			styleEl.innerHTML = styleContent;
+			document.head.appendChild(styleEl);
 
-		// try {
-		// 	await Promise.race([
-		// 		Promise.all([loadPlugins(), initPluginManager()]),
-		// 		BetterNCM.utils.delay(2000),
-		// 	]);
-		// } catch (e) {
-		// 	onLoadError(e);
-		// 	return;
-		// }
+			await initPluginManager();
 
-		if ("loadingMask" in window) {
-			const anim = loadingMask.animate(
-				[{ opacity: 1 }, { opacity: 0, display: "none" }],
-				{
-					duration: 300,
-					fill: "forwards",
-					easing: "cubic-bezier(0.42,0,0.58,1)",
-				},
-			);
-			anim.commitStyles();
+			try {
+				await loadPlugins();
+			} catch (e) {
+				console.warn(e, e.stack);
+			}
+
+			// try {
+			// 	await Promise.race([
+			// 		Promise.all([loadPlugins(), initPluginManager()]),
+			// 		BetterNCM.utils.delay(2000),
+			// 	]);
+			// } catch (e) {
+			// 	onLoadError(e);
+			// 	return;
+			// }
+
+			if ("loadingMask" in window) {
+				const anim = loadingMask.animate(
+					[{ opacity: 1 }, { opacity: 0, display: "none" }],
+					{
+						duration: 300,
+						fill: "forwards",
+						easing: "cubic-bezier(0.42,0,0.58,1)",
+					},
+				);
+				anim.commitStyles();
+			}
+			onPluginLoaded(loadedPlugins); // 更新插件管理器那边的插件列表
+		} catch (err) {
+			document.body.innerHTML = err;
 		}
-		onPluginLoaded(loadedPlugins); // 更新插件管理器那边的插件列表
-	} catch (err) {
-		document.body.innerHTML = err;
-	}
-});
+	});
+}
